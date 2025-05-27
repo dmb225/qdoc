@@ -1,27 +1,14 @@
-import logging
 import os
-import subprocess
 import tempfile
 
 import streamlit as st
 from dotenv import load_dotenv
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
-from llama_index.embeddings.ollama import OllamaEmbedding
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.groq import Groq
 
 
-def ensure_ollama_model(model_name: str) -> None:
-    try:
-        subprocess.run(["ollama", "pull", model_name], check=True)
-        logging.info(f"Successfully pulled model: {model_name}")
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to pull model '{model_name}'. Error: {e}") from e
-
-
 def execute_rag(llm: Groq, model_name: str) -> None:
-    # Ensure embedding model is pulled
-    ensure_ollama_model(model_name)
-
     st.title("Q&A with Your Documents")
     st.markdown("Upload your `.pdf` files to build a semantic search index and ask questions.")
     uploaded_files = st.file_uploader("Upload text files", type="pdf", accept_multiple_files=True)
@@ -41,7 +28,9 @@ def execute_rag(llm: Groq, model_name: str) -> None:
             documents = SimpleDirectoryReader(input_dir=temp_dir).load_data()
 
             # Create vector index
-            embedding_model = OllamaEmbedding(model_name=model_name)
+            embedding_model = HuggingFaceEmbedding(
+                model_name=model_name,
+            )
             index = VectorStoreIndex.from_documents(documents, embed_model=embedding_model)
             index.storage_context.persist()
 
@@ -62,7 +51,7 @@ def main() -> None:
         raise OSError("Missing GROQ_API_KEY environment variable.")
 
     rag_llm = Groq(model="llama3-70b-8192", api_key=groq_api_key)
-    execute_rag(rag_llm, "nomic-embed-text")
+    execute_rag(rag_llm, "sentence-transformers/all-MiniLM-L6-v2")
 
 
 if __name__ == "__main__":
